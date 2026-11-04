@@ -1,0 +1,10 @@
+{
+  "id": "3364023018689921024",
+  "name": "3364023018689921024",
+  "version": "1.0.0",
+  "description": "3364026409323331584",
+  "author": "3364026409323331584",
+  "slots": {
+    "notes.header": "templates/custom-note-header.njk"
+  }
+}
