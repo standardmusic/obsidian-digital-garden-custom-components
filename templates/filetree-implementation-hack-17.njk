@@ -1,0 +1,129 @@
+{% set chronoPaths = ["logs", "metadata/images"] %}
+
+{% macro menuItem(fileOrFolderName, fileOrFolder, step, currentPath, notes, chronoPaths) %}
+{% if fileOrFolder.isNote or fileOrFolder.isFolder %}
+<div x-show="isOpen" class="{{ 'filelist' if step > 0 }}">
+    {% if fileOrFolder.isNote and not fileOrFolder.hide %}
+    <div @click.stop class="notelink {{ 'active-note' if fileOrFolder.permalink === permalink }}">
+        <a data-note-icon="{{ fileOrFolder.noteIcon }}" style="text-decoration: none;" class="filename"
+            href="{{ fileOrFolder.permalink }}">{{ fileOrFolder.name }}</a>
+    </div>
+    {% elif fileOrFolder.isFolder %}
+    <div class="folder inner-folder" x-data="{ isOpen: $persist(false).as({{ currentPath | dump }}) }"
+        @click.stop="isOpen=!isOpen">
+        <div class="foldername-wrapper align-icon">
+            <i x-show="isOpen" style="display: none;" data-lucide="chevron-down"></i>
+            <i x-show="!isOpen" data-lucide="chevron-right"></i>
+            <span class="foldername">{{ fileOrFolderName }}</span>
+        </div>
+
+        {% if currentPath in chronoPaths %}
+        {# 1. Render Subfolders first #}
+        {% for childName, child in fileOrFolder %}
+        {% if child.isFolder %}
+        {{ menuItem(childName, child, step+1, (currentPath + "/" + childName), notes, chronoPaths) }}
+        {% endif %}
+        {% endfor %}
+
+        {# 2. THE PURE TEMPLATE HACK: Build a sortable string array #}
+        {% set rawList = "" %}
+        {% for childName, child in fileOrFolder %}
+        {% if child.isNote and not child.hide %}
+        {# Fallback to old date string if no date property exists #}
+        {% set noteDate = child.date | default("1970-01-01") %}
+        {# We construct a flat string using a delimiter and collect them into a string block #}
+        {% set rawList = rawList + noteDate + "||" + childName + "||" + (child | dump) + "___" %}
+        {% endif %}
+        {% endfor %}
+
+        {# 3. Split the string block into a real array, sort it, and reverse for newest first #}
+        {% set sortedItems = rawList.split("___") | sort | reverse %}
+
+        {# 4. Unpack the sorted strings back into usable variables #}
+        {% for itemString in sortedItems %}
+        {% if itemString | trim %}
+        {% set parts = itemString.split("||") %}
+        {% set itemChronoName = parts[1] %}
+        {# Safely evaluate the dumped JSON string back into an object token #}
+        {% set itemChronoChild = parts[2] | safe if parts[2] else null %}
+
+        {% if itemChronoChild %}
+        {{ menuItem(itemChronoName, itemChronoChild, step+1, (currentPath + "/" + itemChronoName), notes, chronoPaths) }}
+        {% endif %}
+        {% endif %}
+        {% endfor %}
+
+        {% else %}
+        {# Standard alphabetical loop branch #}
+        {% for subName, subChild in fileOrFolder %}
+        {{ menuItem(subName, subChild, step+1, (currentPath + "/" + subName), notes, chronoPaths) }}
+        {% endfor %}
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
+<div x-init="isDesktop = (window.innerWidth>=1000) ? true: false;"
+    x-on:resize.window="isDesktop = (window.innerWidth>=1000) ? true : false;"
+    x-data="{isDesktop: true, showFilesMobile: false}">
+
+    {# MOBILE NAVBAR PANEL #}
+    <div x-show.important="!isDesktop"
+        style="display: none; display: flex; align-items: center; justify-content: space-between; padding: 10px 15px; background: var(--background-secondary, #f5f5f5); border-bottom: 1px solid var(--border-color, #e5e5e5); gap: 10px;"
+        class="mobile-nav-bar">
+
+        <button @click.stop="showFilesMobile = !showFilesMobile"
+            style="background: none; border: none; cursor: pointer; padding: 5px; display: flex; align-items: center; color: var(--text-normal, #333);">
+            <i data-lucide="menu" style="width: 24px; height: 24px;"></i>
+        </button>
+
+        {% for imp in dynamics.navbar.start %}
+        {% include imp %}
+        {% endfor %}
+        {% for imp in dynamics.navbar.end %}
+        {% include imp %}
+        {% endfor %}
+
+        <div style="flex-grow: 1; display: flex; justify-content: flex-end;">
+            {% if settings.dgEnableSearch === true %}
+            {% include "src/plugins/dg-search/templates/searchButton.njk" ignore missing %}
+            {% endif %}
+        </div>
+    </div>
+
+    <div x-show="showFilesMobile && !isDesktop" @click="showFilesMobile = false" style="display:none;"
+        class="fullpage-overlay"></div>
+
+    <div class="filetree-wrapper" x-show.important="isDesktop || showFilesMobile" style="display: none;">
+        <nav class="filetree-sidebar">
+            {% for imp in dynamics.filetree.beforeTitle %}
+            {% include imp %}
+            {% endfor %}
+            {% if meta.siteLogoPath %}
+            <a href="/" style="text-decoration: none; display: flex; justify-content: center;">
+                <img class="site-logo" src="{{ meta.siteLogoPath }}" alt="{{ meta.siteName }}">
+            </a>
+            {% else %}
+            <a href="/" style="text-decoration: none; text-align: center;">
+                <h1 style="text-align:center;">{{ meta.siteName }}</h1>
+            </a>
+            {% endif %}
+            {% for imp in dynamics.filetree.afterTitle %}
+            {% include imp %}
+            {% endfor %}
+
+            {# Desktop Search #}
+            {% if settings.dgEnableSearch === true %}
+            {% include "src/plugins/dg-search/templates/searchButton.njk" ignore missing %}
+            {% endif %}
+
+            <div class="folder" x-data="{ isOpen: true }" x-show="isOpen">
+                {%- for rootName, rootFolder in filetree -%}
+                {{ menuItem(rootName, rootFolder, 0, rootName, collections.note, chronoPaths) }}
+                {%- endfor -%}
+            </div>
+        </nav>
+    </div>
+</div>

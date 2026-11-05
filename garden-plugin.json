@@ -6,5 +6,11 @@
   "author": "3364026409323331584",
   "slots": {
     "notes.header": "templates/custom-note-header.njk"
-  }
+  },
+  "regions": {
+    "navigation": "templates/filetree.njk"
+  },
+  "noteSettings": [
+    "dgShowFileTree"
+  ]
 }
