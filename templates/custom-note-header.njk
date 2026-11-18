@@ -1,67 +1,312 @@
-{% if noteProps %}
+{# =====================================================================
+   0. PURE NUNJUCKS DATE FORMATTER MACRO (YYYY MMM D [h:mm AM/PM])
+   ===================================================================== #}
+{% macro formatScbDate(rawVal) -%}
+{%- if rawVal -%}
+{%- set s = (rawVal | string) | trim -%}
+{%- if s != "" and s != "undefined" and s != "null" -%}
+{%- set months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] -%}
+{%- set jsParts = s.split(" ") -%}
 
-<!-- Layout Matrix Generation Processing Engine -->
+{# Case A: Native JS Date stringified (e.g., "Fri Nov 13 2026 19:30:00 GMT+0000...") #}
+{%- if (jsParts | length) >= 5 and (jsParts[1] in months) -%}
+{%- set mo = jsParts[1] -%}
+{%- set dy = jsParts[2] | int -%}
+{%- set yr = jsParts[3] -%}
+{%- set timeStr = jsParts[4] -%}
+
+{%- if ":" in timeStr -%}
+{%- set t = timeStr.split(":") -%}
+{%- set h = t[0] | int -%}
+{%- set min = t[1] -%}
+{%- if h == 0 and (min | int) == 0 -%}
+{{ yr }} {{ mo }} {{ dy }}
+{%- else -%}
+{%- set ampm = 'PM' if h >= 12 else 'AM' -%}
+{%- set h12 = (h - 12) if h > 12 else (12 if h == 0 else h) -%}
+{{ yr }} {{ mo }} {{ dy }} {{ h12 }}:{{ min }} {{ ampm }}
+{%- endif -%}
+{%- else -%}
+{{ yr }} {{ mo }} {{ dy }}
+{%- endif -%}
+
+{# Case B: ISO or YYYY-MM-DD HH:mm string #}
+{%- else -%}
+{%- set cleanStr = s | replace("T", " ") | replace(r/(\.\d+)?(Z|[+-]\d{2}:?\d{2})$/i, "") | trim -%}
+{%- set parts = cleanStr.split(" ") -%}
+{%- set datePart = parts | first -%}
+
+{%- if datePart and ("-" in datePart) -%}
+{%- set d = datePart.split("-") -%}
+{%- if (d | length) >= 3 -%}
+{%- set yr = d[0] -%}
+{%- set moIdx = (d[1] | int) - 1 -%}
+{%- set mo = months[moIdx] if (moIdx >= 0 and moIdx < 12) else d[1] -%}
+{%- set dy = d[2] | int -%}
+
+{%- if (parts | length) >= 2 and (":" in parts[1]) -%}
+{%- set timePart = parts[1] -%}
+{%- set t = timePart.split(":") -%}
+{%- set h = t[0] | int -%}
+{%- set min = t[1] -%}
+
+{%- if h == 0 and (min | int) == 0 -%}
+{{ yr }} {{ mo }} {{ dy }}
+{%- else -%}
+{%- set ampm = 'PM' if h >= 12 else 'AM' -%}
+{%- set h12 = (h - 12) if h > 12 else (12 if h == 0 else h) -%}
+{{ yr }} {{ mo }} {{ dy }} {{ h12 }}:{{ min }} {{ ampm }}
+{%- endif -%}
+{%- else -%}
+{{ yr }} {{ mo }} {{ dy }}
+{%- endif -%}
+{%- else -%}
+{{ s }}
+{%- endif -%}
+{%- else -%}
+{{ s }}
+{%- endif -%}
+{%- endif -%}
+{%- endif -%}
+{%- endif -%}
+{%- endmacro %}
+
+{# =====================================================================
+   1. METADATA & DATE PRIORITY RESOLUTION (Pure Nunjucks)
+   ===================================================================== #}
+{% set props = noteProps if noteProps else {} %}
+{% set dgReadtime = props['dg-readtime'] if props['dg-readtime'] is defined else dg-readtime %}
+
+{% set timelineRaw = props.timeline or timeline %}
+{% set publishedRaw = props.published or published %}
+
+{% set updatedRaw = props.updated 
+  or updated 
+  or (file.mtime if file and file.mtime else "") 
+  or props['file.mtime'] 
+  or (meta.updated if meta else "") 
+%}
+
+{% set createdRaw = props['created-at'] 
+  or created-at 
+  or props.created 
+  or created 
+  or (file.ctime if file and file.ctime else "") 
+  or props['file.ctime'] 
+  or (meta.created if meta else "") 
+  or (page.date if page and page.date else "") 
+%}
+
+{% set timeline = (formatScbDate(timelineRaw) | string) | trim %}
+{% set published = (formatScbDate(publishedRaw) | string) | trim %}
+{% set updated = (formatScbDate(updatedRaw) | string) | trim %}
+{% set createdFinal = (formatScbDate(createdRaw) | string) | trim %}
+
+{% set source = props.source or source %}
+{% set categories = props.categories or categories %}
+{% set rawTags = props.tags or tags %}
+
+{# =====================================================================
+   2. TOP READING PROGRESS TRACK (Populated & animated via JS)
+   ===================================================================== #}
+<div id="scb-read-progress-track" class="scb-read-progress-track" aria-hidden="true" style="display: none;">
+    <div id="scb-read-progress-fill" class="scb-read-progress-fill"></div>
+</div>
+
+{# =====================================================================
+   3. PILLS MATRIX RENDERING (Pure Nunjucks for Metadata, JS Hook for Read Time)
+   ===================================================================== #}
+<div id="dg-frontmatter-to-html" data-dg-readtime="{{ dgReadtime if dgReadtime is defined else '' }}">
+
+    {# Line 1: Chronological Dates Matrix #}
+    <div class="scb-meta-line">
+        {% if timeline != "" %}
+        <div class="scb-meta-pill scb-pill-yellow">
+            <span>📅</span>
+            <span style="opacity:0.6; margin-right:4px;">Event Timeline:</span>
+            <strong>{{ timeline }}</strong>
+        </div>
+        {% endif %}
+
+        {% if createdFinal != "" and published == "" and timeline == "" %}
+        <div class="scb-meta-pill scb-pill-yellow">
+            <span>✏️</span>
+            <span style="opacity:0.6; margin-right:4px;">Created on:</span>
+            <strong>{{ createdFinal }}</strong>
+        </div>
+        {% endif %}
+
+        {% if published != "" %}
+        <div class="scb-meta-pill">
+            <span>🚀</span>
+            <span style="opacity:0.6; margin-right:4px;">Published on:</span>
+            <strong>{{ published }}</strong>
+        </div>
+        {% endif %}
+
+        {% if updated != "" %}
+        <div class="scb-meta-pill scb-pill-blue">
+            <span>🔄</span>
+            <span style="opacity:0.6; margin-right:4px;">Updated on:</span>
+            <strong>{{ updated }}</strong>
+        </div>
+        {% endif %}
+    </div>
+
+    {# Line 2: Origin Classification System #}
+    {% if source or categories %}
+    <div class="scb-meta-line" style="margin-top: 6px;">
+        {% if source %}
+        <div class="scb-meta-pill">
+            <span>📰</span>
+            <span style="opacity:0.6; margin-right:4px;">source:</span>
+            <strong>{{ source }}</strong>
+        </div>
+        {% endif %}
+
+        {% if categories %}
+        <div class="scb-meta-pill">
+            <span>📁</span>
+            <span style="opacity:0.6; margin-right:4px;">categories:</span>
+            <strong>{{ categories if categories is string else categories | join(", ") }}</strong>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {# Line 3: Isolated Interactive Green Hashtag Link Cells #}
+    {% if rawTags %}
+    {% set tagsArray = rawTags.split(',') if rawTags is string else rawTags %}
+    <div class="scb-meta-line" style="margin-top: 6px;">
+        {% for tag in tagsArray %}
+        {% set cleanTag = tag | trim | replace("#", "") %}
+        {% if cleanTag and cleanTag != "gardenEntry" %}
+        <a href="/tags/{{ cleanTag }}" class="scb-meta-pill scb-tag-cell">
+            <span>#{{ cleanTag }}</span>
+        </a>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# Line 4: Reading Time Pill (Placed under Tags, populated by JS) #}
+    <div id="scb-readtime-row" class="scb-meta-line" style="margin-top: 6px;" hidden>
+        <div class="scb-meta-pill">
+            <span>⏱️</span>
+            <span style="opacity:0.6; margin-right:4px;">Read time:</span>
+            <strong id="scb-readtime-value"></strong>
+        </div>
+    </div>
+
+</div>
+
 <script type="text/javascript">
-document.addEventListener("DOMContentLoaded", function() {
-    // 1. Hook the raw data bridge element generated by your FIRST plugin
-    const bridge = document.getElementById('dg-frontmatter-to-html');
-    if (!bridge) return;
+    document.addEventListener("DOMContentLoaded", function () {
+        const WPM = 200;
 
-    const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const f = (s) => {
-        if (!s) return '';
-        const p = s.split(' ');
-        const d = p[0].split('-');
-        if (d.length < 3) return s;
-        const yr = d[0], mo = m[parseInt(d[1],10)-1], dy = parseInt(d[2],10);
-        if (p.length < 2) return `${yr} ${mo} ${dy}`;
-        const t = p[1].split(':');
-        if (t.length < 2) return `${yr} ${mo} ${dy}`;
-        let h = parseInt(t[0],10), min = t[1], ampm='AM';
-        if (h >= 12) { ampm = 'PM'; if (h > 12) h -= 12; }
-        if (h === 0) h = 12;
-        return `${yr} ${mo} ${dy} ${h}:${min} ${ampm}`;
-    };
+        const container = document.getElementById("dg-frontmatter-to-html");
+        const readtimeRow = document.getElementById("scb-readtime-row");
+        const readtimeVal = document.getElementById("scb-readtime-value");
+        const track = document.getElementById("scb-read-progress-track");
+        const fill = document.getElementById("scb-read-progress-fill");
 
-    const published = f(bridge.getAttribute('data-published'));
-    const timeline = f(bridge.getAttribute('data-timeline'));
-    const source = bridge.getAttribute('data-source');
-    const categories = bridge.getAttribute('data-categories');
-    const rawTags = bridge.getAttribute('data-tags');
-    const nativeCreated = document.querySelector('.timestamps div:nth-child(1)')?.innerText?.replace(/[^0-9A-Za-z\s-:]/g, '').trim();
-    const nativeUpdated = document.querySelector('.timestamps div:nth-child(2)')?.innerText?.replace(/[^0-9A-Za-z\s-:]/g, '').trim();
+        if (!container || !readtimeRow || !readtimeVal) return;
 
-    // Line 1: Chronological Dates Matrix
-    let line1 = '<div class="scb-meta-line">';
-    if (timeline) line1 += `<div class="scb-meta-pill scb-pill-yellow"><span>📅</span><span style="opacity:0.6; margin-right:4px;">Event Timeline:</span><strong>${timeline}</strong></div>`;
-    if (nativeCreated && !published) line1 += `<div class="scb-meta-pill scb-pill-yellow"><span>✏️</span><span style="opacity:0.6; margin-right:4px;">Created on:</span><strong>${nativeCreated}</strong></div>`;
-    if (published) line1 += `<div class="scb-meta-pill"><span>🚀</span><span style="opacity:0.6; margin-right:4px;">Published on:</span><strong>${published}</strong></div>`;
-    if (nativeUpdated) line1 += `<div class="scb-meta-pill scb-pill-blue"><span>🔄</span><span style="opacity:0.6; margin-right:4px;">Updated on:</span><strong>${nativeUpdated}</strong></div>`;
-    line1 += '</div>';
+        const rawOverride = (container.getAttribute("data-dg-readtime") || "").trim().toLowerCase();
+        if (rawOverride === "false") {
+            readtimeRow.remove();
+            if (track) track.remove();
+            return;
+        }
 
-    // Line 2: Origin Classification System
-    let line2 = '<div class="scb-meta-line" style="margin-top: 6px;">';
-    if (source) line2 += `<div class="scb-meta-pill"><span>📰</span><span style="opacity:0.6; margin-right:4px;">source:</span><strong>${source}</strong></div>`;
-    if (categories) line2 += `<div class="scb-meta-pill"><span>📁</span><span style="opacity:0.6; margin-right:4px;">categories:</span><strong>${categories}</strong></div>`;
-    line2 += '</div>';
+        // Locate main note body container in Digital Garden / Forestry
+        const contentEl =
+            document.querySelector(".content .cm-content") ||
+            document.querySelector("main.content") ||
+            document.querySelector(".content") ||
+            document.querySelector("main") ||
+            document.body;
 
-    // Line 3: Isolated Interactive Green Hashtag Link Cells
-    let line3 = '';
-    if (rawTags) {
-        line3 += '<div class="scb-meta-line" style="margin-top: 6px;">';
-        const tagsArray = rawTags.split(',').map(t => t.trim());
-        tagsArray.forEach(tag => {
-            if (tag) {
-                line3 += `<a href="/tags/${tag}" class="scb-meta-pill scb-tag-cell"><span>#${tag}</span></a>`;
+        const clone = contentEl.cloneNode(true);
+
+        // Strip header, pills, sidebars, search modals, SVGs, tables, and Obsidian Bases
+        const excludeSelectors = [
+            "#dg-frontmatter-to-html",
+            ".header-meta",
+            "header",
+            "nav",
+            "aside",
+            ".sidebar",
+            ".filetree-sidebar",
+            ".search-container",
+            "#search-container",
+            ".backlinks",
+            ".graph",
+            "#link-graph",
+            "svg",
+            "table",
+            "[class*='base-']",
+            "[class*='dataview']",
+            ".block-language-base"
+        ];
+
+        clone.querySelectorAll(excludeSelectors.join(",")).forEach(el => el.remove());
+
+        const cleanText = (clone.innerText || clone.textContent || "").replace(/\s+/g, " ").trim();
+        const wordCount = cleanText ? cleanText.split(" ").length : 0;
+        const calcMinutes = wordCount / WPM;
+        const ceilCalcMinutes = Math.ceil(calcMinutes);
+
+        let finalMinutes = 0;
+
+        // check whether dg-readtime is an integer.
+        const parsedNum = parseInt(rawOverride, 10);
+
+        if (rawOverride === "true") {
+            // use calcMinutes when the readtime is greater than 0, otherwise set 1
+            finalMinutes = calcMinutes > 0 ? ceilCalcMinutes : 1;
+        } else if (!isNaN(parsedNum) && parsedNum > 0) {
+            finalMinutes = parsedNum;
+        } else {
+            // Default (no dg-readtime): show only if > 2 full min (400+ words) AND taller than 1 screen
+            const isLongerThanScreen = contentEl.scrollHeight > window.innerHeight * 1.15;
+            if (wordCount > WPM * 2 && isLongerThanScreen) {
+                finalMinutes = ceilCalcMinutes;
             }
-        });
-        line3 += '</div>';
-    }
+        }
 
-    // Safely inject your beautifully styled rows directly into the data element container
-    bridge.innerHTML = line1 + line2 + line3;
-    bridge.style.display = 'flex';
-    bridge.style.visibility = 'visible';
-});
+        if (finalMinutes <= 0) {
+            readtimeRow.remove();
+            if (track) track.remove();
+            return;
+        }
+
+        // 1. Show Read Time Pill under tags
+        readtimeVal.textContent = `${finalMinutes} min`;
+        readtimeRow.style.setProperty("display", "flex", "important");
+
+        // 2. Show & bind Scroll Progress Bar
+        if (track && fill) {
+            track.style.display = "block";
+
+            const updateProgress = () => {
+                const scrollTop = Math.max(
+                    window.scrollY || 0,
+                    document.documentElement.scrollTop || 0,
+                    contentEl.scrollTop || 0
+                );
+                const docHeight = Math.max(
+                    document.documentElement.scrollHeight - window.innerHeight,
+                    contentEl.scrollHeight - contentEl.clientHeight,
+                    1
+                );
+                const pct = Math.min(100, Math.max(0, (scrollTop / docHeight) * 100));
+                fill.style.width = `${pct}%`;
+            };
+
+            window.addEventListener("scroll", updateProgress, { passive: true });
+            contentEl.addEventListener("scroll", updateProgress, { passive: true });
+            updateProgress();
+        }
+    });
 </script>
-{% endif %}
