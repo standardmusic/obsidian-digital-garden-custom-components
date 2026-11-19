@@ -1,0 +1,6 @@
+{% if source_canonical and (
+  source_canonical.startsWith("https://medium.com") or
+  source_canonical.startsWith("https://switchupcb.medium.com")
+) %}
+<link rel="canonical" href="{{ source_canonical }}" />
+{% endif %}

@@ -5,6 +5,7 @@
   "description": "3364026409323331584",
   "author": "3364026409323331584",
   "slots": {
+    "common.head": "templates/canonical.njk",
     "notes.header": "templates/custom-note-header.njk"
   }
 }
