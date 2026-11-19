@@ -4,8 +4,12 @@
   "version": "1.0.0",
   "description": "3364026409323331584",
   "author": "3364026409323331584",
+  "noteSettings": ["dgShowFileTree"],
   "slots": {
     "common.head": "templates/canonical.njk",
     "notes.header": "templates/custom-note-header.njk"
+  },
+  "regions": {
+    "navigation": "templates/filetree.njk"
   }
 }
