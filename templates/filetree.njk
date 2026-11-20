@@ -13,19 +13,27 @@
     {%- set pinned = [] -%}
     {%- set folders = [] -%}
     {%- set notes = [] -%}
+
     {%- for name, child in children -%}
       {%- if child.isFolder -%}
         {%- set ignored = folders.push({ name: name, child: child }) -%}
       {%- elif child.isNote -%}
-        {%- set note = (navigationNotesByUrl[child.permalink] or [])[0] -%}
-        {%- set created = "" -%}
-        {%- if note and note.data -%}
-          {%- set rawDate = note.data["created-at"] or note.data.created -%}
-          {%- if rawDate -%}
-            {%- set created = rawDate | dateToZulu -%}
+        {%- set sortKey = "" -%}
+
+        {%- if currentPath == "logs" -%}
+          {# Extract the leading 19-digit snowflake ID from the filename #}
+          {%- set sortKey = name.slice(0, 19) -%}
+        {%- else -%}
+          {%- set note = (navigationNotesByUrl[child.permalink] or [])[0] -%}
+          {%- if note and note.data -%}
+            {%- set rawDate = note.data["created-at"] or note.data.created -%}
+            {%- if rawDate -%}
+              {%- set sortKey = rawDate | dateToZulu -%}
+            {%- endif -%}
           {%- endif -%}
         {%- endif -%}
-        {%- set row = { name: name, child: child, created: created } -%}
+
+        {%- set row = { name: name, child: child, sortKey: sortKey } -%}
         {%- if child.pinned -%}
           {%- set ignored = pinned.push(row) -%}
         {%- else -%}
@@ -33,13 +41,14 @@
         {%- endif -%}
       {%- endif -%}
     {%- endfor -%}
-    {% for row in pinned | sort(true, false, "created") %}
+
+    {% for row in pinned | sort(true, false, "sortKey") %}
       {{ menuItem(row.name, row.child, step, currentPath + "/" + row.name) }}
     {% endfor %}
     {% for row in folders %}
       {{ menuItem(row.name, row.child, step, currentPath + "/" + row.name) }}
     {% endfor %}
-    {% for row in notes | sort(true, false, "created") %}
+    {% for row in notes | sort(true, false, "sortKey") %}
       {{ menuItem(row.name, row.child, step, currentPath + "/" + row.name) }}
     {% endfor %}
   {%- else -%}
