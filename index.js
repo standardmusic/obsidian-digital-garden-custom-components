@@ -2,7 +2,7 @@ function cleanUrlPath(urlPath) {
   let decoded = urlPath;
   try {
     decoded = decodeURIComponent(urlPath);
-  } catch (e) {}
+  } catch (e) { }
 
   return decoded
     .toLowerCase()
@@ -61,7 +61,28 @@ function setupEleventy(eleventyConfig, context) {
     data.permalink = cleaned.endsWith("/") ? cleaned : `${cleaned}/`;
   });
 
-  // 2. Clean internal <a href="..."> tags in HTML and URLs in Search/Graph JSON
+  // 2. Precompute O(1) sort lookup map once per build (top level of setupEleventy)
+  eleventyConfig.addCollection("navSortKeys", function (collectionApi) {
+    const notes = collectionApi.getFilteredByTag("note");
+    const map = Object.create(null);
+
+    for (const item of notes) {
+      const rawDate = item.data && (item.data["created-at"] || item.data.created);
+      const sortKey = rawDate ? new Date(rawDate).toISOString() : "";
+      if (item.url) {
+        map[item.url] = sortKey;
+        map[cleanHref(item.url)] = sortKey;
+      }
+      if (item.data && item.data.permalink) {
+        map[item.data.permalink] = sortKey;
+        map[cleanHref(item.data.permalink)] = sortKey;
+      }
+    }
+
+    return map;
+  });
+
+  // 3. Clean internal <a href="..."> tags in HTML and URLs in Search/Graph JSON
   eleventyConfig.addTransform("clean-urls", function (content) {
     const out = this.page && this.page.outputPath;
     if (!out) return content;
@@ -79,6 +100,22 @@ function setupEleventy(eleventyConfig, context) {
     }
 
     return content;
+  });
+
+  // Track Build Time and Memory Usage
+  let buildStart = 0;
+
+  eleventyConfig.on("eleventy.before", () => {
+    buildStart = performance.now();
+  });
+
+  eleventyConfig.on("eleventy.after", () => {
+    const elapsedSec = ((performance.now() - buildStart) / 1000).toFixed(2);
+    const used = process.memoryUsage();
+    const toMB = (bytes) => `${Math.round(bytes / 1024 / 1024)} MB`;
+    console.log(
+      `[build] Time: ${elapsedSec}s | RSS: ${toMB(used.rss)} | Heap Used: ${toMB(used.heapUsed)} | Heap Total: ${toMB(used.heapTotal)}`
+    );
   });
 }
 

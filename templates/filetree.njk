@@ -1,8 +1,7 @@
 {# Customize these exact folder paths; no leading or trailing slash. #}
 {% set newestFirstFolders = ["logs", "metadata/images", "metadata/videos", "metadata/links"] %}
 
-{# Native groupby indexes existing note objects once per rendered page. #}
-{% set navigationNotesByUrl = (collections.note or []) | groupby("url") %}
+{% set navSortKeys = collections.navSortKeys or {} %}
 
 {% if settings.dgShowFileTree !== true %}
     {% include "components/navbar.njk" %}
@@ -24,7 +23,7 @@
           {# Extract the leading 19-digit snowflake ID from the filename #}
           {%- set sortKey = name.slice(0, 19) -%}
         {%- else -%}
-          {%- set note = (navigationNotesByUrl[child.permalink] or [])[0] -%}
+          {%- set sortKey = navSortKeys[child.permalink] or "" -%}
           {%- if note and note.data -%}
             {%- set rawDate = note.data["created-at"] or note.data.created -%}
             {%- if rawDate -%}
