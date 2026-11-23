@@ -5,6 +5,7 @@
   "description": "3364026409323331584",
   "author": "3364026409323331584",
   "noteSettings": ["dgShowFileTree"],
+  "styles": ["styles/skeleton-loader.scss"],
   "hooks": "index.js",
   "slots": {
     "common.head": "templates/canonical.njk",

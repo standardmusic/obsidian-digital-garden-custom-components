@@ -45,7 +45,7 @@ function cleanHref(rawHref) {
 }
 
 function setupEleventy(eleventyConfig, context) {
-  console.log("[clean-urls] setupEleventy active!");
+  console.log("[obsidian-digital-garden-custom-components] setupEleventy(eleventyConfig, context)");
 
   // 1. Clean permalinks for all notes before Eleventy computes output paths
   eleventyConfig.addPreprocessor("clean-permalinks", "md", function (data, content) {
