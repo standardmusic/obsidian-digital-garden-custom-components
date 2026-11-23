@@ -1,145 +1,90 @@
-{# Customize these exact folder paths; no leading or trailing slash. #}
-{% set newestFirstFolders = ["logs", "metadata/images", "metadata/videos", "metadata/links"] %}
-
-{% set navSortKeys = collections.navSortKeys or {} %}
+{#
+  Verbatim copy from digitalgarden (https://github.com/oleeskild/digitalgarden/blob/6f961b793e9c4713c4790b6f1199d9fa2a38583e/src/plugins/dg-filetree/templates/filetree.njk)
+  Copyright (c) 2026 Ole Eskild Steensen
+  SPDX-License-Identifier: MIT
+#}
 
 {% if settings.dgShowFileTree !== true %}
-    {% include "components/navbar.njk" %}
+  {% include "components/navbar.njk" %}
 {% else %}
+    <div x-init="isDesktop = (window.innerWidth>=1000) ? true: false;"
+            x-on:resize.window="isDesktop = (window.innerWidth>=1000) ? true : false;"
+            x-data="{isDesktop: true, showFilesMobile: false}">
 
-{%- macro menuChildren(children, step, currentPath) -%}
-  {%- if currentPath in newestFirstFolders -%}
-    {%- set pinned = [] -%}
-    {%- set folders = [] -%}
-    {%- set notes = [] -%}
+        <div x-show.important="!isDesktop" style="display: none;">
+            <nav class="navbar">
+                <div class="navbar-inner">
+                    <span style="font-size: 1.5rem; margin-right: 10px;" @click="showFilesMobile=!showFilesMobile"><i  data-lucide="menu"></i></span>
+                    {% for imp in dynamics.filetree.beforeTitle %}
+                        {% include imp %}
+                    {% endfor %}
+                    {% if meta.siteLogoPath %}
+                    <a href="/" style="text-decoration: none; flex: 1; display: flex; justify-content: center;">
+                            <img class="site-logo" src="{{meta.siteLogoPath}}" alt="{{meta.siteName}}">
+                    </a>
+                    {% else %}
+                    <a href="/" style="text-decoration: none; text-align: center;">
+                            <h1 style="margin: 15px !important;">{{meta.siteName}}</h1>
+                    </a>
+                    {% endif %}
+                    {% for imp in dynamics.filetree.afterTitle %}
+                        {% include imp %}
+                    {% endfor %}
+                </div>
 
-    {%- for name, child in children -%}
-      {%- if child.isFolder -%}
-        {%- set ignored = folders.push({ name: name, child: child }) -%}
-      {%- elif child.isNote -%}
-        {%- set sortKey = "" -%}
-
-        {%- if currentPath == "logs" -%}
-          {# Extract the leading 19-digit snowflake ID from the filename #}
-          {%- set sortKey = name.slice(0, 19) -%}
-        {%- else -%}
-          {%- set sortKey = navSortKeys[child.permalink] or "" -%}
-          {%- if note and note.data -%}
-            {%- set rawDate = note.data["created-at"] or note.data.created -%}
-            {%- if rawDate -%}
-              {%- set sortKey = rawDate | dateToZulu -%}
-            {%- endif -%}
-          {%- endif -%}
-        {%- endif -%}
-
-        {%- set row = { name: name, child: child, sortKey: sortKey } -%}
-        {%- if child.pinned -%}
-          {%- set ignored = pinned.push(row) -%}
-        {%- else -%}
-          {%- set ignored = notes.push(row) -%}
-        {%- endif -%}
-      {%- endif -%}
-    {%- endfor -%}
-
-    {% for row in pinned | sort(true, false, "sortKey") %}
-      {{ menuItem(row.name, row.child, step, currentPath + "/" + row.name) }}
-    {% endfor %}
-    {% for row in folders %}
-      {{ menuItem(row.name, row.child, step, currentPath + "/" + row.name) }}
-    {% endfor %}
-    {% for row in notes | sort(true, false, "sortKey") %}
-      {{ menuItem(row.name, row.child, step, currentPath + "/" + row.name) }}
-    {% endfor %}
-  {%- else -%}
-    {% for name, child in children %}
-      {{ menuItem(name, child, step, currentPath + "/" + name) }}
-    {% endfor %}
-  {%- endif -%}
-{%- endmacro -%}
-
-{% macro menuItem(fileOrFolderName, fileOrFolder, step, currentPath) %}
-{%if fileOrFolder.isNote or fileOrFolder.isFolder%}
-<div x-show="isOpen" style="display:none" class="{{'filelist' if step>0}}">
-    {%if fileOrFolder.isNote and not fileOrFolder.hide %}
-    <div @click.stop class="notelink {{ 'active-note' if fileOrFolder.permalink === permalink}}">
-        <a data-note-icon="{{fileOrFolder.noteIcon}}" style="text-decoration: none;" class="filename"
-            href="{{fileOrFolder.permalink}}">{{fileOrFolder.name}} </a>
-    </div>
-    {% elif fileOrFolder.isFolder%}
-    <div class="folder inner-folder" x-data="{isOpen: $persist(false).as({{currentPath | dump}})}"
-        @click.stop="isOpen=!isOpen">
-        <div class="foldername-wrapper align-icon">
-            <i x-show="isOpen" style="display: none;" data-lucide="chevron-down"></i>
-            <i x-show="!isOpen" data-lucide="chevron-right"></i>
-            <span class="foldername">{{fileOrFolderName}}</span>
+                <div class="navbar-actions">
+                    {% set slotName = "navbar.actions" %}{% include "components/pluginSlot.njk" %}
+                    {% include "components/pagePanelButton.njk" %}
+                </div>
+            </nav>
         </div>
-        {{ menuChildren(fileOrFolder, step+1, currentPath) }}
-    </div>
-    {% endif %}
-</div>
-{%endif%}
-{% endmacro %}
 
-<div x-init="isDesktop = (window.innerWidth>=1000) ? true: false;"
-    x-on:resize.window="isDesktop = (window.innerWidth>=1000) ? true : false;"
-    x-data="{isDesktop: true, showFilesMobile: false}">
+        <div x-show="showFilesMobile && !isDesktop" @click="showFilesMobile = false" style="display:none;" class="fullpage-overlay"></div>
 
-    <div x-show.important="!isDesktop" style="display: none;">
-        <nav class="navbar">
-            <div class="navbar-inner">
-                <span style="font-size: 1.5rem; margin-right: 10px;" @click="showFilesMobile=!showFilesMobile"><i
-                        data-lucide="menu"></i></span>
-                {% for imp in dynamics.filetree.beforeTitle %}
-                {% include imp %}
-                {% endfor %}
-                {% if meta.siteLogoPath %}
-                <a href="/" style="text-decoration: none; flex: 1; display: flex; justify-content: center;">
-                    <img class="site-logo" src="{{meta.siteLogoPath}}" alt="{{meta.siteName}}">
-                </a>
-                {% else %}
-                <a href="/" style="text-decoration: none; text-align: center;">
-                    <h1 style="margin: 15px !important;">{{meta.siteName}}</h1>
-                </a>
-                {% endif %}
-                {% for imp in dynamics.filetree.afterTitle %}
-                {% include imp %}
-                {% endfor %}
-            </div>
-
-            <div class="navbar-actions">
-                {% set slotName = "navbar.actions" %}{% include "components/pluginSlot.njk" %}
-                {% include "components/pagePanelButton.njk" %}
-            </div>
-        </nav>
-    </div>
-
-    <div x-show="showFilesMobile && !isDesktop" @click="showFilesMobile = false" style="display:none;"
-        class="fullpage-overlay"></div>
-
-    <div class="filetree-wrapper" x-show.important="isDesktop || showFilesMobile" style="display: none;">
-        <nav class="filetree-sidebar">
-            {% for imp in dynamics.filetree.beforeTitle %}
+      <div class="filetree-wrapper" x-show.important="isDesktop || showFilesMobile" style="display: none;">
+      <nav class="filetree-sidebar">
+        {% for imp in dynamics.filetree.beforeTitle %}
             {% include imp %}
-            {% endfor %}
-            {% if meta.siteLogoPath %}
-            <a href="/" style="text-decoration: none; display: flex; justify-content: center;">
-                <img class="site-logo" src="{{meta.siteLogoPath}}" alt="{{meta.siteName}}">
-            </a>
-            {% else %}
-            <a href="/" style="text-decoration: none; text-align: center;">
-                <h1 style="text-align:center;">{{meta.siteName}}</h1>
-            </a>
-            {% endif %}
-            {% for imp in dynamics.filetree.afterTitle %}
+        {% endfor %}
+         {% if meta.siteLogoPath %}
+         <a href="/" style="text-decoration: none; display: flex; justify-content: center;">
+                   <img class="site-logo" src="{{meta.siteLogoPath}}" alt="{{meta.siteName}}">
+         </a>
+         {% else %}
+         <a href="/" style="text-decoration: none; text-align: center;">
+                   <h1 style="text-align:center;">{{meta.siteName}}</h1>
+         </a>
+         {% endif %}
+         {% for imp in dynamics.filetree.afterTitle %}
             {% include imp %}
-            {% endfor %}
-            {% set slotName = "filetree.actions" %}{% include "components/pluginSlot.njk" %}
-            <div class="folder" x-data="{isOpen: true}">
-                {%- for fileOrFolderName, fileOrFolder in filetree -%}
-                {{menuItem(fileOrFolderName, fileOrFolder, 0, fileOrFolderName)}}
-                {%- endfor -%}
-            </div>
-        </nav>
+        {% endfor %}
+        {% set slotName = "filetree.actions" %}{% include "components/pluginSlot.njk" %}
+         {#- The tree itself is rendered once to /filetree.html (see ../index.js) rather than into every page. -#}
+         <div class="folder" x-data="{isOpen: true}"></div>
+         <script>
+           (function () {
+             var root = document.currentScript.previousElementSibling;
+             var trim = function (p) { return p.replace(/\/+$/, "") || "/"; };
+             fetch("/filetree.html?v={{ meta.buildDate | isoDate }}")
+               .then(function (res) {
+                 if (!res.ok) throw new Error("HTTP " + res.status);
+                 return res.text();
+               })
+               .then(function (html) {
+                 root.innerHTML = html;
+                 var here = trim(location.pathname);
+                 root.querySelectorAll("a.filename").forEach(function (a) {
+                   if (trim(new URL(a.getAttribute("href"), location.href).pathname) === here) {
+                     a.parentElement.classList.add("active-note");
+                   }
+                 });
+                 // Icons in the tree arrive after lucideIcons.njk ran on DOMContentLoaded.
+                 if (window.lucide) lucide.createIcons({ attrs: { class: ["svg-icon"] } });
+               })
+               .catch(function (err) { console.warn("Could not load the file tree:", err); });
+           })();
+         </script>
+      </nav>
+      </div>
     </div>
-</div>
 {% endif %}

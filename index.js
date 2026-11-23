@@ -1,3 +1,14 @@
+/*
+ * Copyright (c) 2026 SwitchUpCB
+ * Licensed under the GNU Affero General Public License v3.0 (AGPL-3.0-or-later).
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ *
+ * Contains portions derived from digitalgarden (https://github.com/oleeskild/digitalgarden/blob/6f961b793e9c4713c4790b6f1199d9fa2a38583e/src/plugins/dg-filetree/index.js)
+ * Copyright (c) 2026 Ole Eskild Steensen — Licensed under the MIT License.
+ */
+const fs = require("fs");
+const path = require("path");
+
 function cleanUrlPath(urlPath) {
   let decoded = urlPath;
   try {
@@ -81,6 +92,17 @@ function setupEleventy(eleventyConfig, context) {
 
     return map;
   });
+
+  // 2.1 Render the filetree once to /filetree.html instead so the sidebar fetches it and marks the current note client-side.
+  const treeTemplate = fs.readFileSync(
+      path.join(context.pluginDir, "templates", "tree.njk"),
+      "utf8"
+    );
+    
+    eleventyConfig.addTemplate("dg-filetree-tree.njk", treeTemplate, {
+      permalink: "/filetree.html",
+      eleventyExcludeFromCollections: true,
+    });
 
   // 3. Clean internal <a href="..."> tags in HTML and URLs in Search/Graph JSON
   eleventyConfig.addTransform("clean-urls", function (content) {
